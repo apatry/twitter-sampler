@@ -109,10 +109,16 @@
     (try
       (read-string content)
       (catch Exception e 
-        (throw (IllegalArgumentException. (str "Invalid credentials " content)))))))
+        (throw (IllegalArgumentException. (str "Invalid credentials " content) e))))))
 
 (defn- printlog
   "Print logging messages on *err*"
+  [& args]
+  (binding [*out* *err*]
+    (apply println args)))
+
+(defn- printerr
+  "Print error messages on *err*"
   [& args]
   (binding [*out* *err*]
     (apply println args)))
@@ -137,12 +143,10 @@
        (println banner))
 
      (not credentials)
-     (binding [*out* *err*]
-       (println "Credentials are required."))
+     (printerr "Credentials are required.")     
 
      (not-empty args)
-     (binding [*out* *err*]
-       (println "Too many arguments."))
+     (printerr "Too many arguments.")
 
      :else
      (binding [*credentials* (load-credentials credentials)]
@@ -154,8 +158,7 @@
            (printlog "Saving tweets")
            (generate-stream @tweets *out*)
            (flush))
-         (binding [*out* *err*]
-           println "Invalid credentials"))))
+         (printerr "Invalid credentials"))))
 
     ;; needed to avoid waiting around a minute for the program to end
     (shutdown-agents)
