@@ -15,14 +15,6 @@
 
 (def ^:dynamic *credentials* "Credentials to use for twitter." nil)
 
-(defn stop-after
-  "A callback returning :abort after n tweets are processed."
-  [n]
-  (let [calls (atom 0)]
-    (fn [tweet] 
-      (swap! calls inc)
-      (when (>= @calls n) :abort))))
-
 (defn- valid-credentials?
   "Predicates checking if credentials are valid."
   [c]
@@ -47,6 +39,19 @@
       ;; only valid response are processed
       (when  (and (>= code 200) (< code 300))
         (f (-> baos str (parse-string true)))))))
+
+(defn stop-after
+  "A callback returning :abort after n tweets are processed."
+  [n]
+  (let [calls (atom 0)]
+    (fn [tweet]
+      (swap! calls inc)
+      (when (>= @calls n) :abort))))
+
+(defn write-json
+  "A callback encoding tweets as json on out"
+  [out]
+  #(generate-stream % out))
 
 (defn download-tweets
   "Download tweets and pass them as arguments to all the supplied callbacks f. Tweets are downloaded until one callback returns :abort."
@@ -153,10 +158,8 @@
        (if (valid-credentials? *credentials*)
          (do
            (printlog "Downloading tweets")
-           (download-tweets #(swap! tweets conj %) 
+           (download-tweets (write-json *out*)
                             (stop-after size))
-           (printlog "Saving tweets")
-           (generate-stream @tweets *out*)
            (flush))
          (printerr "Invalid credentials"))))
 
