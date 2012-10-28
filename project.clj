@@ -1,4 +1,7 @@
 (defproject twitter-sampler "1.0.0-SNAPSHOT"
-  :description "Save tweets from the sample streaming api."
+  :description "Build a corpus of tweets using the sample streaming api."
   :dependencies [[org.clojure/clojure "1.4.0"]
-                 [twitter-api "0.6.11"]])
+                 [org.clojure/data.json "0.2.0"]
+                 [org.clojure/tools.cli "0.2.2"]
+                 [twitter-api "0.6.11"]]
+  :main com.textjuicer.twitter.sampler)
