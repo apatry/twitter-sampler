@@ -26,17 +26,17 @@
 (defn- valid-credentials?
   "Predicates checking if credentials are valid."
   [c]
-  (subset? #{:app-key :app-secret :user-token :user-token-secret} 
+  (subset? #{:consumer-key :consumer-secret :access-token :access-token-secret} 
            (set (keys c))))
 
 (defn- make-credentials
   "Create oauth-credentials from a map containing twitter credentials."
   [c]
   {:pre [(valid-credentials? c)]}
-  (make-oauth-creds (:app-key c)
-                    (:app-secret c)
-                    (:user-token c)
-                    (:user-token-secret c)))
+  (make-oauth-creds (:consumer-key c)
+                    (:consumer-secret c)
+                    (:acces-token c)
+                    (:access-token-secret c)))
 
 (defn- on-tweet
   "Helper to create a callback to process a tweet."
