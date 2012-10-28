@@ -35,7 +35,7 @@
   {:pre [(valid-credentials? c)]}
   (make-oauth-creds (:consumer-key c)
                     (:consumer-secret c)
-                    (:acces-token c)
+                    (:access-token c)
                     (:access-token-secret c)))
 
 (defn- on-tweet
