@@ -22,6 +22,9 @@ where `credentials.clj` contains your twitter credentials, `-n`
 specifies the number of tweets to download and `tweets.json` is the
 file where tweets are saved.
 
+For details about tweets structure, see
+https://dev.twitter.com/docs/platform-objects/tweets.
+
 ## How does it work?
 
 This application is built with clojure and uses
