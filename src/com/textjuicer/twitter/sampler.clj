@@ -2,12 +2,12 @@
   (:use
    [clojure.set :only (subset?)]
    [clojure.tools.cli :only (cli)]
+   [cheshire.core :only (generate-stream parse-string)]
    [twitter.oauth :only (make-oauth-creds)]
    [twitter.callbacks.handlers :only (exception-print response-return-everything)]
    [twitter.api.streaming :only
     (statuses-sample)])
   (:require
-   [clojure.data.json :as json]
    [http.async.client :as ac])
   (:import
    (twitter.callbacks.protocols AsyncStreamingCallback))
@@ -46,7 +46,7 @@
         [code (:code (ac/status r))]
       ;; only valid response are processed
       (when  (and (>= code 200) (< code 300))
-        (f (-> baos str json/read-json))))))
+        (f (-> baos str (parse-string true)))))))
 
 (defn download-tweets
   "Download tweets and pass them as arguments to all the supplied callbacks f. Tweets are downloaded until one callback returns :abort."
@@ -149,9 +149,10 @@
        (if (valid-credentials? *credentials*)
          (do
            (printlog "Downloading tweets")
-           (download-tweets #(swap! tweets conj %) (stop-after size))
+           (download-tweets #(swap! tweets conj %) 
+                            (stop-after size))
            (printlog "Saving tweets")
-           (json/pprint-json (deref tweets))
+           (generate-stream @tweets *out*)
            (flush))
          (binding [*out* *err*]
            println "Invalid credentials"))))
