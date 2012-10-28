@@ -10,17 +10,17 @@ This program uses twitter streaming api, which can only be accessed by
 authenticated user. In order to create your credentials, you must
 create a twitter application using https://dev.twitter.com/apps/new.
 
-Once your application is created, you can doownland a
+Once your application is created, you can downland a
 [sample configuration file](https://raw.github.com/apatry/twitter-sampler/master/credentials.clj)
 and fill in the blanks. You can then
-[download twitter sampler](https://github.com/downloads/apatry/twitter-sampler/twitter-sampler-1.0.0-SNAPSHOT-standalone.jar)
-and run it with the following command to download 1000 tweets in the
-file `tweets.json`:
+download [twitter-sampler-1.0.0-SNAPSHOT-standalone.jar](https://github.com/downloads/apatry/twitter-sampler/twitter-sampler-1.0.0-SNAPSHOT-standalone.jar)
+and run it:
 
 	java -jar twitter-sampler-1.0.0-SNAPSHOT-standalone.jar -c credentials.clj -n 1000 > tweets.json
 
-where `credentials.clj` contains your twitter credentials and `-n`
-specifies the number of tweets to download.
+where `credentials.clj` contains your twitter credentials, `-n`
+specifies the number of tweets to download and `tweets.json` is the
+file where tweets are saved.
 
 ## How does it work?
 
@@ -32,6 +32,6 @@ endpoint of the twitter api.
 
 ## License
 
-Copyright (C) 2012 FIXME
+Copyright (C) 2012 Alexandre Patry
 
 Distributed under the Eclipse Public License, the same as Clojure.
