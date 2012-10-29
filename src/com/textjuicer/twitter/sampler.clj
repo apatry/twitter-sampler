@@ -52,33 +52,33 @@
   [credentials & f]
   ;; the client must be close to ensure its thread-pool is freed
   (with-open [client (ac/create-client :request-timeout -1 :follow-redirect false)]
-    (let 
+    (let
         [;; identify original tweet (returns false for deleted tweet,
          ;; retweet, ...)
          tweet? #(:id %)
 
          ;; call all callback and returns :abort when at least one of
          ;; them returns :abort
-         process-tweet #(when (tweet? %) 
+         process-tweet #(when (tweet? %)
                           (some #{:abort} (doall ((apply juxt f) %))))
 
          ;; this callback will store each tweet in "tweets"
          callback (AsyncStreamingCallback.
                    (on-tweet #(process-tweet %))
-                   
+
                    (fn [response]
                      (binding [*out* *err*]
-                       (-> response 
-                           (response-return-everything :to-json? false) 
+                       (-> response
+                           (response-return-everything :to-json? false)
                            println)))
 
-                   (fn [response throwable] 
+                   (fn [response throwable]
                      (binding [*out* *err*]
-                       (exception-print response throwable)))) 
+                       (exception-print response throwable))))
 
          ;; open the stream with twitter
          response (statuses-sample :oauth-creds credentials
-                                   :callbacks callback                             
+                                   :callbacks callback
                                    :client client)]
 
       ;; wait until one callback returns :abort and then close the stream
@@ -87,12 +87,12 @@
 (defn -main
   "Small CLI application to download tweets in a file."
   [& argv]
-  (let [[options args banner] 
+  (let [[options args banner]
         (cli argv
-             ["-c" "--credentials" "File containing twitter API credentials." 
+             ["-c" "--credentials" "File containing twitter API credentials."
               :default nil]
              ["-h" "--help" "Print this online help" :flag true :default false]
-             ["-n" "--size" "Number of tweets to download." 
+             ["-n" "--size" "Number of tweets to download."
               :default 1000 :parse-fn #(Integer. %)])
         credentials (:credentials options)
         size (:size options)]
@@ -104,7 +104,7 @@
        (println banner))
 
      (not credentials)
-     (printerr "Credentials are required.")     
+     (printerr "Credentials are required.")
 
      (empty? args)
      (printerr "One argument is required.")
@@ -115,7 +115,7 @@
      :else
      (if-let [creds (read-credentials credentials)]
        (with-open [out (writer (first args))]
-         (download-tweets creds 
+         (download-tweets creds
                           (write-json out)
                           (stop-after size)))
        (printerr "Invalid credentials (" credentials ")"))))
