@@ -7,6 +7,7 @@
    [twitter.callbacks.handlers :only (exception-print response-return-everything)]
    [twitter.api.streaming :only (statuses-sample)])
   (:require
+   [clojure.string :as str]
    [http.async.client :as ac]
    [com.textjuicer.twitter.protocols])
   (:import com.textjuicer.twitter.protocols.AsyncStreamingCallback)
@@ -52,6 +53,17 @@
   "A callback encoding tweets as json on out"
   [out]
   #(generate-stream % out))
+
+(defn report-progress
+  "Reports the number of tweets that have been processed on *out*."
+  [n]
+  (let [progress (atom 0)]
+    (fn [_]
+      (swap! progress inc)
+      (when (< 0.1 (rand))
+        (print "\r" @progress "tweets"))
+      (when (= @progress n)
+        (println)))))
 
 (defn download-tweets
   "Download tweets and pass them as arguments to all the supplied
@@ -118,6 +130,7 @@
        (with-open [out (writer output)]
          (download-tweets creds
                           (write-json out)
+                          (report-progress size)
                           (stop-after size)))
        (printerr "Invalid credentials"))))
   nil)
