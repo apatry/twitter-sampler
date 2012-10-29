@@ -4,13 +4,12 @@
    [clojure.tools.cli :only (cli)]
    [cheshire.core :only (generate-stream parse-string)]
    [com.textjuicer.twitter.credentials :only (read-credentials)]
-   [twitter.callbacks.handlers :only (exception-print handle-response response-return-everything)]
+   [twitter.callbacks.handlers :only (exception-print response-return-everything)]
    [twitter.api.streaming :only (statuses-sample)])
   (:require
    [http.async.client :as ac]
-   [http.async.client.request :as req])
-  (:import
-   (twitter.callbacks.protocols AsyncSyncStatus SingleStreamingStatus EmitCallbackList))
+   [com.textjuicer.twitter.protocols])
+  (:import com.textjuicer.twitter.protocols.AsyncStreamingCallback)
   (:gen-class))
 
 (defn- on-tweet
@@ -35,25 +34,6 @@
   "A callback encoding tweets as json on out"
   [out]
   #(generate-stream % out))
-
-(defrecord StoppableAsyncStreamingCallback
-    [on-bodypart
-     on-failure
-     on-exception]
-
-  AsyncSyncStatus (get-async-sync [_] :async)
-  SingleStreamingStatus (get-single-streaming [_] :streaming)
-
-  EmitCallbackList
-  (emit-callback-list
-    [this]
-    (merge req/*default-callbacks*
-           {:completed (fn [response] (handle-response response this :events #{:on-failure}))
-            :part (fn [response baos] 
-                    (if (= :abort ((:on-bodypart this) response baos)) 
-                      [baos :abort]
-                      [baos :continue]))
-            :error (fn [response throwable] ((:on-exception this) response throwable) throwable)})))
 
 (defn- printlog
   "Print logging messages on *err*"
@@ -83,7 +63,7 @@
                           (some #{:abort} (doall ((apply juxt f) %))))
 
          ;; this callback will store each tweet in "tweets"
-         callback (StoppableAsyncStreamingCallback.
+         callback (AsyncStreamingCallback.
                    (on-tweet #(process-tweet %))
                    
                    (fn [response]
