@@ -1,36 +1,17 @@
 (ns com.textjuicer.twitter.sampler
   (:use
    [clojure.java.io :only (writer)]
-   [clojure.set :only (subset?)]
    [clojure.tools.cli :only (cli)]
    [cheshire.core :only (generate-stream parse-string)]
-   [twitter.oauth :only (make-oauth-creds)]
+   [com.textjuicer.twitter.credentials :only (read-credentials)]
    [twitter.callbacks.handlers :only (exception-print handle-response response-return-everything)]
-   [twitter.api.streaming :only
-    (statuses-sample)])
+   [twitter.api.streaming :only (statuses-sample)])
   (:require
    [http.async.client :as ac]
    [http.async.client.request :as req])
   (:import
    (twitter.callbacks.protocols AsyncSyncStatus SingleStreamingStatus EmitCallbackList))
   (:gen-class))
-
-(def ^:dynamic *credentials* "Credentials to use for twitter." nil)
-
-(defn- valid-credentials?
-  "Predicates checking if credentials are valid."
-  [c]
-  (subset? #{:consumer-key :consumer-secret :access-token :access-token-secret} 
-           (set (keys c))))
-
-(defn- make-credentials
-  "Create oauth-credentials from a map containing twitter credentials."
-  [c]
-  {:pre [(valid-credentials? c)]}
-  (make-oauth-creds (:consumer-key c)
-                    (:consumer-secret c)
-                    (:access-token c)
-                    (:access-token-secret c)))
 
 (defn- on-tweet
   "Helper to create a callback to process a tweet."
@@ -88,7 +69,7 @@
 
 (defn download-tweets
   "Download tweets and pass them as arguments to all the supplied callbacks f. Tweets are downloaded until one callback returns :abort."
-  [& f]
+  [credentials & f]
   ;; the client must be close to ensure its thread-pool is freed
   (with-open [client (ac/create-client :request-timeout -1 :follow-redirect false)]
     (let 
@@ -116,22 +97,12 @@
                        (exception-print response throwable)))) 
 
          ;; open the stream with twitter
-         response (statuses-sample :oauth-creds  (make-credentials *credentials*)
+         response (statuses-sample :oauth-creds credentials
                                    :callbacks callback                             
                                    :client client)]
 
       ;; wait until one callback returns :abort and then close the stream
       (ac/await response))))
-
-(defn load-credentials
-  "Load credentials from file f."
-  [f]
-  (let
-      [content (slurp f)]
-    (try
-      (read-string content)
-      (catch Exception e 
-        (throw (IllegalArgumentException. (str "Invalid credentials " content) e))))))
 
 (defn -main
   "Small CLI application to download tweets in a file."
@@ -162,10 +133,10 @@
      (printerr "Too many arguments.")
 
      :else
-     (binding [*credentials* (load-credentials credentials)]
-       (if (valid-credentials? *credentials*)
-         (with-open [out (writer (first args))]
-           (download-tweets (write-json out)
-                            (stop-after size)))
-         (printerr "Invalid credentials")))))
+     (if-let [creds (read-credentials credentials)]
+       (with-open [out (writer (first args))]
+         (download-tweets creds 
+                          (write-json out)
+                          (stop-after size)))
+       (printerr "Invalid credentials (" credentials ")"))))
   nil)
