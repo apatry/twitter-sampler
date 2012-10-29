@@ -9,7 +9,7 @@
 (defn- valid-credentials?
   "Predicates checking if credentials are valid."
   [c]
-  (subset? #{:consumer-key :consumer-secret :access-token :access-token-secret} 
+  (subset? #{:consumer-key :consumer-secret :access-token :access-token-secret}
            (set (keys c))))
 
 (defn- make-credentials
@@ -23,7 +23,7 @@
 
 (defn read-credentials
   "Reads oauth credentials from f, which should be a valid parameter
-  for clojure.java.io/reader."  
+  for clojure.java.io/reader."
   [f]
   (with-open [input (PushbackReader. (reader f))]
     (-> input read make-credentials)))
