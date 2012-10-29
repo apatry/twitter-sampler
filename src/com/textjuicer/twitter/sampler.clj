@@ -1,16 +1,18 @@
 (ns com.textjuicer.twitter.sampler
   (:use
+   [clojure.java.io :only (writer)]
    [clojure.set :only (subset?)]
    [clojure.tools.cli :only (cli)]
    [cheshire.core :only (generate-stream parse-string)]
    [twitter.oauth :only (make-oauth-creds)]
-   [twitter.callbacks.handlers :only (exception-print response-return-everything)]
+   [twitter.callbacks.handlers :only (exception-print handle-response response-return-everything)]
    [twitter.api.streaming :only
     (statuses-sample)])
   (:require
-   [http.async.client :as ac])
+   [http.async.client :as ac]
+   [http.async.client.request :as req])
   (:import
-   (twitter.callbacks.protocols AsyncStreamingCallback))
+   (twitter.callbacks.protocols AsyncSyncStatus SingleStreamingStatus EmitCallbackList))
   (:gen-class))
 
 (def ^:dynamic *credentials* "Credentials to use for twitter." nil)
@@ -53,68 +55,24 @@
   [out]
   #(generate-stream % out))
 
-(defn download-tweets
-  "Download tweets and pass them as arguments to all the supplied callbacks f. Tweets are downloaded until one callback returns :abort."
-  [& f]
-  (let 
-      [;; a promise that is realised when downloads should abort
-       abort (promise)
+(defrecord StoppableAsyncStreamingCallback
+    [on-bodypart
+     on-failure
+     on-exception]
 
-       ;; identify original tweet (returns false for deleted tweet,
-       ;; retweet, ...)
-       tweet? #(:id %)
+  AsyncSyncStatus (get-async-sync [_] :async)
+  SingleStreamingStatus (get-single-streaming [_] :streaming)
 
-       ;; call all callback and returns :abort when at least one of
-       ;; them returns :abort
-       process-tweet #(when (tweet? %) 
-                        (some #{:abort} (doall ((apply juxt f) %))))
-
-       ;; this callback will store each tweet in "tweets"
-       callback (AsyncStreamingCallback.
-                 ;; call every callbacks and abort downloads if one of
-                 ;; them returns :abort
-                 (on-tweet 
-                  (fn [tweet] 
-                    (when (= :abort (process-tweet tweet))
-                      (deliver abort true))))
-                 
-                 ;; on error, print the whole response and abort
-                 (fn [response]
-                   (binding [*out* *err*]
-                     (-> response 
-                         (response-return-everything :to-json? false) 
-                         println))
-                   (deliver abort true))
-
-                 ;; on exception, print the exception and abort
-                 (fn [response throwable] 
-                   (binding [*out* *err*]
-                     (exception-print response throwable) 
-                     (deliver abort true)))) 
-
-       ;; open the stream with twitter
-       response (statuses-sample :oauth-creds  (make-credentials *credentials*)
-                                 :callbacks callback
-
-                                 ;; default request-timeout is not
-                                 ;; enough, we change it
-                                 :client (ac/create-client
-                                          :request-timeout -1
-                                          :follow-redirect false))]
-
-    ;; wait until one callback returns :abort and then close the stream
-    @abort
-    ((:cancel (meta response)))))
-
-(defn load-credentials
-  "Load credentials from file f."
-  [f]
-  (let
-      [content (slurp f)]
-    (try
-      (read-string content)
-      (catch Exception e 
-        (throw (IllegalArgumentException. (str "Invalid credentials " content) e))))))
+  EmitCallbackList
+  (emit-callback-list
+    [this]
+    (merge req/*default-callbacks*
+           {:completed (fn [response] (handle-response response this :events #{:on-failure}))
+            :part (fn [response baos] 
+                    (if (= :abort ((:on-bodypart this) response baos)) 
+                      [baos :abort]
+                      [baos :continue]))
+            :error (fn [response throwable] ((:on-exception this) response throwable) throwable)})))
 
 (defn- printlog
   "Print logging messages on *err*"
@@ -128,6 +86,53 @@
   (binding [*out* *err*]
     (apply println args)))
 
+(defn download-tweets
+  "Download tweets and pass them as arguments to all the supplied callbacks f. Tweets are downloaded until one callback returns :abort."
+  [& f]
+  ;; the client must be close to ensure its thread-pool is freed
+  (with-open [client (ac/create-client :request-timeout -1 :follow-redirect false)]
+    (let 
+        [;; identify original tweet (returns false for deleted tweet,
+         ;; retweet, ...)
+         tweet? #(:id %)
+
+         ;; call all callback and returns :abort when at least one of
+         ;; them returns :abort
+         process-tweet #(when (tweet? %) 
+                          (some #{:abort} (doall ((apply juxt f) %))))
+
+         ;; this callback will store each tweet in "tweets"
+         callback (StoppableAsyncStreamingCallback.
+                   (on-tweet #(process-tweet %))
+                   
+                   (fn [response]
+                     (binding [*out* *err*]
+                       (-> response 
+                           (response-return-everything :to-json? false) 
+                           println)))
+
+                   (fn [response throwable] 
+                     (binding [*out* *err*]
+                       (exception-print response throwable)))) 
+
+         ;; open the stream with twitter
+         response (statuses-sample :oauth-creds  (make-credentials *credentials*)
+                                   :callbacks callback                             
+                                   :client client)]
+
+      ;; wait until one callback returns :abort and then close the stream
+      (ac/await response))))
+
+(defn load-credentials
+  "Load credentials from file f."
+  [f]
+  (let
+      [content (slurp f)]
+    (try
+      (read-string content)
+      (catch Exception e 
+        (throw (IllegalArgumentException. (str "Invalid credentials " content) e))))))
+
 (defn -main
   "Small CLI application to download tweets in a file."
   [& argv]
@@ -139,8 +144,8 @@
              ["-n" "--size" "Number of tweets to download." 
               :default 1000 :parse-fn #(Integer. %)])
         credentials (:credentials options)
-        size (:size options)
-        tweets (atom [])]
+        size (:size options)]
+
     (cond
      (:help options)
      (do
@@ -150,20 +155,17 @@
      (not credentials)
      (printerr "Credentials are required.")     
 
-     (not-empty args)
+     (empty? args)
+     (printerr "One argument is required.")
+
+     (> (count args) 1)
      (printerr "Too many arguments.")
 
      :else
      (binding [*credentials* (load-credentials credentials)]
        (if (valid-credentials? *credentials*)
-         (do
-           (printlog "Downloading tweets")
-           (download-tweets (write-json *out*)
-                            (stop-after size))
-           (flush))
-         (printerr "Invalid credentials"))))
-
-    ;; needed to avoid waiting around a minute for the program to end
-    (shutdown-agents)
-    (System/exit 0)
-))
+         (with-open [out (writer (first args))]
+           (download-tweets (write-json out)
+                            (stop-after size)))
+         (printerr "Invalid credentials")))))
+  nil)
