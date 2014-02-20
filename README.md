@@ -20,7 +20,9 @@ and run it:
 
 where `credentials.clj` contains your twitter credentials, `-n`
 specifies the number of tweets to download and `tweets.json` is the
-file where tweets are saved.
+file where tweets are saved. You can also specify a proxy
+configuration file using `-p`, see `proxy-sample.clj` for a sample
+configuration file.
 
 For details about tweets structure, see
 https://dev.twitter.com/docs/platform-objects/tweets.
