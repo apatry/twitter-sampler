@@ -1,16 +1,19 @@
 (ns com.textjuicer.twitter.sampler
   (:use
-   [clojure.java.io :only (writer)]
+   [clojure.java.io :only (reader writer)]
    [clojure.tools.cli :only (cli)]
    [cheshire.core :only (generate-stream parse-string)]
    [com.textjuicer.twitter.credentials :only (read-credentials)]
    [twitter.callbacks.handlers :only (exception-print response-return-everything)]
    [twitter.api.streaming :only (statuses-sample)])
   (:require
+   [clojure.edn :as edn]
    [clojure.string :as str]
    [http.async.client :as ac]
    [com.textjuicer.twitter.protocols])
-  (:import com.textjuicer.twitter.protocols.AsyncStreamingCallback)
+  (:import 
+   com.textjuicer.twitter.protocols.AsyncStreamingCallback
+   java.io.PushbackReader)
   (:gen-class))
 
 (defn- printlog
@@ -67,12 +70,14 @@
 
 (defn download-tweets
   "Download tweets and pass them as arguments to all the supplied
-  callbacks f. Tweets are downloaded until one callback
+  callbacks (list of functions). Tweets are downloaded until one callback
   returns :abort."
-  [credentials & f]
+  [credentials callbacks & {:keys [proxy]}]
 
   ;; the client must be close to ensure its thread-pool is freed
-  (with-open [client (ac/create-client :request-timeout -1 :follow-redirect false)]
+  (with-open [client (ac/create-client :request-timeout -1 
+                                       :follow-redirect false
+                                       :proxy proxy)]
     (let
         [;; identify original tweet (returns false for deleted tweet,
          ;; retweet, ...)
@@ -81,7 +86,7 @@
          ;; call all callbacks passed in parameters and return :abort
          ;; when at least one of them returns :abort
          process-tweet #(when (tweet? %)
-                          (some #{:abort} (doall ((apply juxt f) %))))
+                          (some #{:abort} (doall ((apply juxt callbacks) %))))
 
          callback (AsyncStreamingCallback.
                    (on-tweet process-tweet)
@@ -96,6 +101,12 @@
       ;; wait until one callback returns :abort and then close the stream
       (ac/await response))))
 
+(defn read-edn
+  "Read an edn datastructure from a file."
+  [f]
+  (with-open [rdr (PushbackReader. (reader f))]
+    (edn/read rdr)))
+
 (defn -main
   "Small CLI application to download tweets in a file."
   [& argv]
@@ -105,10 +116,13 @@
               :default nil]
              ["-h" "--help" "Print this online help" :flag true :default false]
              ["-n" "--size" "Number of tweets to download."
-              :default 1000 :parse-fn #(Integer. %)])
+              :default 1000 :parse-fn #(Integer. %)]
+             ["-p" "--proxy" "Proxy configuration file."])
         credentials (:credentials options)
         size (:size options)
-        output (first args)]
+        output (first args)
+        proxy-file (:proxy options)
+        proxy (when proxy-file (read-edn proxy-file))]
 
     (cond
      (:help options)
@@ -128,9 +142,13 @@
      :else
      (if-let [creds (read-credentials credentials)]
        (with-open [out (writer output)]
+         (when proxy
+           (println "Downloading using proxy " proxy)
+           (println "Invalid proxy parameters may make the connection hangs."))
          (download-tweets creds
-                          (write-json out)
-                          (report-progress size)
-                          (stop-after size)))
+                          [(write-json out)
+                           (report-progress size)
+                           (stop-after size)]
+                          :proxy proxy))
        (printerr "Invalid credentials"))))
   nil)
