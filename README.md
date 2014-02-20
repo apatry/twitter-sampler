@@ -37,6 +37,6 @@ endpoint of the twitter api.
 
 ## License
 
-Copyright (C) 2012 Alexandre Patry
+Copyright (C) 2012-2014 Alexandre Patry
 
 Distributed under the Eclipse Public License, the same as Clojure.
