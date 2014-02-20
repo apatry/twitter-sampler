@@ -13,7 +13,7 @@ create a twitter application using https://dev.twitter.com/apps/new.
 Once your application is created, you can downland a
 [sample configuration file](https://raw.github.com/apatry/twitter-sampler/master/credentials.clj)
 and fill in the blanks. You can then
-download [twitter-sampler-1.0.0-SNAPSHOT-standalone.jar](https://github.com/downloads/apatry/twitter-sampler/twitter-sampler-1.0.0-SNAPSHOT-standalone.jar)
+download [twitter-sampler-1.0.0-SNAPSHOT-standalone.jar](http://static.textjuicer.com/twitter-sampler-1.0.0-SNAPSHOT-standalone.jar)
 and run it:
 
 	java -jar twitter-sampler-1.0.0-SNAPSHOT-standalone.jar -c credentials.clj -n 1000 tweets.json
