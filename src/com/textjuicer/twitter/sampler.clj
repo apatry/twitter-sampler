@@ -145,10 +145,16 @@
          (when proxy
            (println "Downloading using proxy " proxy)
            (println "Invalid proxy parameters may make the connection hangs."))
-         (download-tweets creds
-                          [(write-json out)
-                           (report-progress size)
-                           (stop-after size)]
-                          :proxy proxy))
+         (let
+             [counter (atom 0)]
+           (while (< @counter size)
+             (when (> @counter 0)
+               (println "Connection closed after " @counter " tweets, resuming..."))
+             (download-tweets creds
+                              [(write-json out)
+                               (report-progress size)
+                               (stop-after (- size @counter))
+                               (fn [tweet] (swap! counter inc))]
+                              :proxy proxy))))
        (printerr "Invalid credentials"))))
   nil)
