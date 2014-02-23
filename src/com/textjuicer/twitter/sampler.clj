@@ -63,8 +63,7 @@
   (let [progress (atom 0)]
     (fn [_]
       (swap! progress inc)
-      (when (< 0.1 (rand))
-        (print "\r" @progress "tweets"))
+      (print "\r" @progress "tweets")
       (when (= @progress n)
         (println)))))
 
