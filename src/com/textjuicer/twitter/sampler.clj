@@ -148,7 +148,8 @@
              [counter (atom 0)]
            (while (< @counter size)
              (when (> @counter 0)
-               (println "Connection closed after " @counter " tweets, resuming..."))
+               (println "Connection closed after " @counter " tweets, resuming in 10 seconds...")
+               (Thread/sleep 10000))
              (download-tweets creds
                               [(write-json out)
                                (report-progress size)
