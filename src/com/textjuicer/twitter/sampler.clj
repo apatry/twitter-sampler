@@ -4,7 +4,7 @@
    [clojure.tools.cli :only (cli)]
    [com.textjuicer.twitter.credentials :only (read-credentials)]
    [twitter.callbacks.handlers :only (exception-print response-return-everything)]
-   [twitter.api.streaming :only (statuses-sample)])
+   [twitter.api.streaming :only (statuses-filter statuses-sample)])
   (:require
    [clojure.edn :as edn]
    [clojure.string :as str]
@@ -52,7 +52,7 @@
   "Download tweets and pass them as arguments to all the supplied
   callbacks (list of functions). Tweets are downloaded until one callback
   returns :abort."
-  [credentials size out & {:keys [proxy]}]
+  [api credentials size out & {:keys [params proxy]}]
 
   ;; the client must be close to ensure its thread-pool is freed
   (with-open [twitter-out (PipedOutputStream.)
@@ -63,7 +63,7 @@
     (let
         [;; identify original tweet (returns false for deleted tweet,
          ;; retweet, ...)
-         tweet? #("id" %)
+         tweet? #(% "id")
 
          callback (AsyncStreamingCallback.
                    (write-tweet twitter-out)
@@ -71,9 +71,10 @@
                    #(binding [*out* *err*] (exception-print %1 %2)))
 
          ;; open the stream with twitter
-         response (statuses-sample :oauth-creds credentials
-                                   :callbacks callback
-                                   :client client)]
+         response (api :oauth-creds credentials
+                       :callbacks callback
+                       :client client
+                       :params params)]
 
       ;; wait until one callback returns :abort and then close the stream
       (doseq [[i tweet] (map-indexed vector (take size (filter tweet? (json/parsed-seq in))))]
@@ -97,9 +98,11 @@
              ["-h" "--help" "Print this online help" :flag true :default false]
              ["-n" "--size" "Number of tweets to download."
               :default 1000 :parse-fn #(Integer. %)]
-             ["-p" "--proxy" "Proxy configuration file."])
+             ["-p" "--proxy" "Proxy configuration file."]
+             ["-t" "--track" "Keywords, mentions or hashtags to track (separated by comma)"])
         credentials (:credentials options)
         size (:size options)
+        track (:track options)
         output (first args)
         proxy-file (:proxy options)
         proxy (when proxy-file (read-edn proxy-file))]
@@ -125,6 +128,8 @@
          (when proxy
            (println "Downloading using proxy " proxy)
            (println "Invalid proxy parameters may make the connection hangs."))
-         (download-tweets creds size out :proxy proxy))
+         (if track
+           (download-tweets statuses-filter creds size out :proxy proxy :params {:track track})
+           (download-tweets statuses-sample creds size out :proxy proxy)))
        (printerr "Invalid credentials"))))
   nil)
