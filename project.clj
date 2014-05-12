@@ -1,4 +1,4 @@
-(defproject twitter-sampler "1.0.0-SNAPSHOT"
+(defproject twitter-sampler "1.0.0"
   :description "Build a corpus of tweets using twitter streaming api."
   :url "https://github.com/apatry/twitter-sampler"
   :license {:name "Eclipse Public License - v 1.0"
