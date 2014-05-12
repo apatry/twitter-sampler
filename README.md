@@ -13,14 +13,15 @@ create a twitter application using https://dev.twitter.com/apps/new.
 Once your application is created, you can downland a
 [sample configuration file](https://raw.github.com/apatry/twitter-sampler/master/credentials.clj)
 and fill in the blanks. You can then
-download [twitter-sampler-1.0.0-SNAPSHOT-standalone.jar](http://static.textjuicer.com/twitter-sampler-1.0.0-SNAPSHOT-standalone.jar)
+download [twitter-sampler-1.0.0-standalone.jar](http://static.textjuicer.com/twitter-sampler-1.0.0-standalone.jar)
 and run it:
 
-	java -jar twitter-sampler-1.0.0-SNAPSHOT-standalone.jar -c credentials.clj -n 1000 tweets.json
+	java -jar twitter-sampler-1.0.0-standalone.jar -c credentials.clj -n 1000 -t '#clippers' tweets.json
 
 where `credentials.clj` contains your twitter credentials, `-n`
-specifies the number of tweets to download and `tweets.json` is the
-file where tweets are saved. You can also specify a proxy
+specifies the number of tweets to download, `-t` specifies an optional
+coma separated list of keywords or hash to track and `tweets.json` is
+the file where tweets are saved. You can also specify a proxy
 configuration file using `-p`, see `proxy-sample.clj` for a sample
 configuration file.
 
@@ -33,7 +34,9 @@ This application is built with clojure and uses
 [twitter-api](https://github.com/adamwynne/twitter-api) to download
 tweets from the
 [`/statuses/sample`](https://dev.twitter.com/docs/api/1.1/get/statuses/sample)
-endpoint of the twitter api.
+or
+[`/statuses/filter`](https://dev.twitter.com/docs/api/1.1/post/statuses/filter)
+endpoints of the twitter api.
 
 ## License
 
